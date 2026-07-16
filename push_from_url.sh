@@ -89,7 +89,7 @@ while IFS= read -r url; do
       ((fail++))
     fi
   fi
-done < "$URL_FILE"
+done < "$BUNDLE_URL_FILE"
 
 echo ""
 echo "Results: $pass passed, $fail failed"
