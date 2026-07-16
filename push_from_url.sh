@@ -66,8 +66,8 @@ echo "Downloading public key..."
 echo "Verifying signatures..."
 echo ""
 
-set passed=0
-set failed=0
+passed=0
+failed=0
 
 while IFS= read -r url; do
   [[ -z "$url" || "$url" == \#* ]] && continue
@@ -92,10 +92,10 @@ while IFS= read -r url; do
 
     if [[ "$result" == "Verified OK" ]]; then
       echo "OK    $filename"
-      ((passed++))
+      ((passed++)) || true
     else
       echo "FAIL  $filename  ($result)"
-      ((failed++))
+      ((failed++)) || true
     fi
   fi
 done < "$BUNDLE_URL_FILE"
