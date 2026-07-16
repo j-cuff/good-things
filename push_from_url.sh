@@ -92,10 +92,11 @@ while IFS= read -r url; do
 
     if [[ "$result" == "Verified OK" ]]; then
       echo "OK    $filename"
-      ((passed++)) || true
+      passed=$((passed + 1))
+      
     else
       echo "FAIL  $filename  ($result)"
-      ((failed++)) || true
+      failed=$((failed + 1))
     fi
   fi
 done < "$BUNDLE_URL_FILE"
