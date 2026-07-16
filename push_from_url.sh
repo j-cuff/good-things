@@ -37,6 +37,14 @@ while IFS= read -r url; do
   [[ -z "$url" || "$url" == \#* ]] && continue
 
   filename="${url##*/}"
+
+  # ── Skip if file already exists ──────────────────────────────────────────────
+  if [[ -f "$filename" ]]; then
+    echo "SKIP  $filename (already exists)"
+    echo ""
+    continue
+  fi
+
   echo "Downloading: $filename"
   echo "  From: $url"
   curl -O -L -u "${DOWNLOAD_USER}:${DOWNLOAD_PASS}" "$url"
@@ -54,11 +62,12 @@ echo "Downloading public key..."
   fi
   echo "Public key saved: $PUBLIC_KEY"
   echo ""
+
 echo "Verifying signatures..."
 echo ""
 
-pass=0
-fail=0
+passed=0
+failed=0
 
 while IFS= read -r url; do
   [[ -z "$url" || "$url" == \#* ]] && continue
@@ -83,16 +92,16 @@ while IFS= read -r url; do
 
     if [[ "$result" == "Verified OK" ]]; then
       echo "OK    $filename"
-      ((pass++))
+      ((passed++))
     else
       echo "FAIL  $filename  ($result)"
-      ((fail++))
+      ((failed++))
     fi
   fi
 done < "$BUNDLE_URL_FILE"
 
 echo ""
-echo "Results: $pass passed, $fail failed"
+echo "Results: $passed passed, $failed failed"
 
 echo "==> Authenticating to ECR..."
 
