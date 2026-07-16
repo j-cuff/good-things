@@ -14,4 +14,5 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AIRGAP_DIR="${SCRIPT_DIR}/spectroairgap-${VERTEX_VERSION}"
 SKIP_EXTRACTION="true"
 BINARY="./airgap-vertex-v${VERTEX_VERSION}.bin" # set to true to skip extraction of the binary if it already exists
-
+PUBLIC_KEY="spectro_public_key.pem"
+PUBLIC_KEY_URL="https://artifact-studio.spectrocloud.com/spectro_public_key.pem"
