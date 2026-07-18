@@ -37,17 +37,19 @@ while IFS= read -r url; do
   [[ -z "$url" || "$url" == \#* ]] && continue
 
   filename="${url##*/}"
+  dest="${BUNDLE_DIR}/${filename}"
 
   # ── Skip if file already exists ──────────────────────────────────────────────
-  if [[ -f "$filename" ]]; then
-    echo "SKIP  $filename (already exists)"
+  if [[ -f "$dest" ]]; then
+    echo "SKIP  $filename (already exists) in ${BUNDLE_DIR})"
     echo ""
     continue
   fi
 
   echo "Downloading: $filename"
   echo "  From: $url"
-  curl -O -L -u "${DOWNLOAD_USER}:${DOWNLOAD_PASS}" "$url"
+  echo "  To:   $dest"
+  curl -L -u "${DOWNLOAD_USER}:${DOWNLOAD_PASS}" -o "$dest" "$url"
   echo ""
 done < "$BUNDLE_URL_FILE"
 
@@ -55,7 +57,7 @@ echo "All downloads complete!"
 
 echo "Validating downloaded files in ${BUNDLE_DIR}..."
 echo "Downloading public key..."
-  curl -O -L "$PUBLIC_KEY_URL"
+  curl -O -L "downloads/$PUBLIC_KEY_URL"
   if [[ ! -f "$PUBLIC_KEY" ]]; then
     echo "Error: Failed to download '$PUBLIC_KEY'. Cannot verify signatures."
     exit 1
