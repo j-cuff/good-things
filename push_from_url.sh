@@ -43,7 +43,7 @@ while IFS= read -r url; do
 
   # ── Skip if file already exists ──────────────────────────────────────────────
   if [[ -f "$dest" ]]; then
-    echo "SKIP  $filename (already exists) in ${BUNDLE_DIR})"
+    echo "SKIP  $filename (already exists) in ${BUNDLE_DIR}/downloads/)"
     echo ""
     continue
   fi
@@ -92,24 +92,32 @@ while IFS= read -r url; do
   if [[ "$filename" == *.zst ]]; then
     sigfile="${filename%.zst}.sig.bin"
 
-    if [[ ! -f "$filename" ]]; then
-      echo "SKIP  $filename (file not found locally)"
+    zst_path="${BUNDLE_DIR}/downloads/${filename}"
+    sig_path="${BUNDLE_DIR}/downloads/${sigfile}"
+    key_path="${BUNDLE_DIR}/downloads/${PUBLIC_KEY}"
+
+    if [[ ! -f "$zst_path" ]]; then
+      echo "SKIP  $filename (file not found: $zst_path)"
       continue
     fi
 
-    if [[ ! -f "$sigfile" ]]; then
-      echo "SKIP  $filename (sig file '$sigfile' not found)"
+    if [[ ! -f "$sig_path" ]]; then
+      echo "SKIP  $filename (signature not found: $sig_path)"
       continue
     fi
 
-    result=$(openssl dgst -sha256 -verify "${BUNDLE_DIR}/downloads/${PUBLIC_KEY}" -signature "$sigfile" "$filename" 2>&1)
+    result=$(
+      openssl dgst -sha256 \
+        -verify "$key_path" \
+        -signature "$sig_path" \
+        "$zst_path" 2>&1
+    )
 
     if [[ "$result" == "Verified OK" ]]; then
       echo "OK    $filename"
       passed=$((passed + 1))
-      
     else
-      echo "FAIL  $filename  ($result)"
+      echo "FAIL  $filename ($result)"
       failed=$((failed + 1))
     fi
   fi
