@@ -38,7 +38,8 @@ while IFS= read -r url; do
   [[ -z "$url" || "$url" == \#* ]] && continue
 
   filename="${url##*/}"
-  dest="${BUNDLE_DIR}/${filename}"
+  mkdir -p "${BUNDLE_DIR}/downloads"
+  dest="${BUNDLE_DIR}/downloads/${filename}"
 
   # ── Skip if file already exists ──────────────────────────────────────────────
   if [[ -f "$dest" ]]; then
@@ -60,8 +61,6 @@ echo "Validating downloaded files in ${BUNDLE_DIR}..."
 PUBLIC_KEY_PATH="${BUNDLE_DIR}/downloads/${PUBLIC_KEY}"
 if [[ ! -f "${PUBLIC_KEY_PATH}" ]]; then
   echo "Public key not found. Downloading..."
-  mkdir -p "${BUNDLE_DIR}/downloads"
-
   curl -fL "$PUBLIC_KEY_URL" -o "${PUBLIC_KEY_PATH}"
 
   if [[ ! -f "${PUBLIC_KEY_PATH}" ]]; then
