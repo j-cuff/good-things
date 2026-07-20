@@ -118,7 +118,6 @@ done < "$BUNDLE_URL_FILE"
 
 echo ""
 echo "Results: $passed passed, $failed failed"
-exit
 echo "==> Authenticating to ECR..."
 
 palette content registry-login \
