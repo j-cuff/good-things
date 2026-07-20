@@ -57,16 +57,26 @@ done < "$BUNDLE_URL_FILE"
 echo "All downloads complete!"
 
 echo "Validating downloaded files in ${BUNDLE_DIR}..."
-echo "Downloading public key..."
+PUBLIC_KEY_PATH="${BUNDLE_DIR}/downloads/${PUBLIC_KEY}"
+if [[ ! -f "${PUBLIC_KEY_PATH}" ]]; then
+  echo "Public key not found. Downloading..."
   mkdir -p "${BUNDLE_DIR}/downloads"
-  curl -L -o "${BUNDLE_DIR}/downloads/${PUBLIC_KEY}" "$PUBLIC_KEY_URL"
-  # curl -O -L "$PUBLIC_KEY_URL"
-  if [[ ! -f "${BUNDLE_DIR}/downloads/${PUBLIC_KEY}" ]]; then
-    echo "Error: Failed to download '$PUBLIC_KEY'. Cannot verify signatures."
+
+  curl -fL "$PUBLIC_KEY_URL" -o "${PUBLIC_KEY_PATH}"
+
+  if [[ ! -f "${PUBLIC_KEY_PATH}" ]]; then
+    echo "Error: Failed to download '${PUBLIC_KEY}'. Cannot verify signatures."
     exit 1
   fi
-  echo "Public key saved: ${BUNDLE_DIR}/downloads/${PUBLIC_KEY}"
-  echo ""
+
+  chmod 644 "${PUBLIC_KEY_PATH}"
+
+  echo "Public key saved: ${PUBLIC_KEY_PATH}"
+else
+  echo "Public key already exists: ${PUBLIC_KEY_PATH}"
+fi
+
+echo ""
 
 echo "Verifying signatures..."
 echo ""
