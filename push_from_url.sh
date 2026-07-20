@@ -133,10 +133,10 @@ palette content registry-login \
   --password "$(aws ecr get-login-password \
   --region ${AWS_REGION})"
 
-echo "==> Pushing all .zst bundles from ${BUNDLE_DIR} to ${ECR_REGISTRY}/${BASE_PATH}"
+echo "==> Pushing all .zst bundles from ${BUNDLE_DIR}/downloads/ to ${ECR_REGISTRY}/${BASE_PATH}"
 
-for bundle in "${BUNDLE_DIR}"/*.zst; do
-  [[ -f "$bundle" ]] || { echo "No .zst files found in ${BUNDLE_DIR}"; exit 1; }
+for bundle in "${BUNDLE_DIR}"/downloads/*.zst; do
+  [[ -f "$bundle" ]] || { echo "No .zst files found in ${BUNDLE_DIR}/downloads/"; exit 1; }
   echo "--> Pushing: ${bundle}"
   palette content push \
     --file "${bundle}" \
