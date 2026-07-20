@@ -3,10 +3,11 @@
 # Usage: ./push-bundles.sh <bundle-dir> <ecr-account-id> <region> <base-path>
 # Example: ./push-bundles.sh ./bundles 103448924380 us-gov-west-1 cuff-airgap/spectro-packs
 # Build a bundle, copy urls to file, then download and push to ECR using this script.
-set -uo pipefail
+set -euo pipefail
 source ./common-config.sh
 source ./common-functions.sh
 
+ECR_PACK_BASE="spectro-packs"
 validateVar AWS_ACCOUNT
 validateVar AWS_REGION
 validateVar ECR_BASE_CONTENT_PATH warn || true
@@ -16,10 +17,10 @@ validateVar ECR_REGISTRY
 validateVar DOWNLOAD_USER
 validateVar DOWNLOAD_PASS
 
-BUNDLE_DIR="${1:?Usage: $0 <bundle-dir>}" || echo "Bundle Directory: ${BUNDLE_DIR}"
-BUNDLE_URL_FILE="zst_urls.txt" || echo "Bundle URL File: ${BUNDLE_URL_FILE}"
+export BUNDLE_DIR="${1:?Usage: $0 <bundle-dir>}" || echo "Bundle Directory: ${BUNDLE_DIR}"
+export BUNDLE_URL_FILE="zst_urls.txt" || echo "Bundle URL File: ${BUNDLE_URL_FILE}"
 #check for urls.txt file validation
-BASE_PATH="${ECR_BASE_CONTENT_PATH:+${ECR_BASE_CONTENT_PATH%/}/}${ECR_PACK_BASE#/}" || echo "Base Content Path: ${BASE_PATH}"
+export BASE_PATH="${ECR_BASE_CONTENT_PATH:+${ECR_BASE_CONTENT_PATH%/}/}${ECR_PACK_BASE#/}" || echo "Base Content Path: ${BASE_PATH}"
 
 
 echo "==> Downloading all .zst bundles from ${BUNDLE_URL_FILE} to ${BUNDLE_DIR}"
@@ -64,7 +65,7 @@ echo "Downloading public key..."
     echo "Error: Failed to download '$PUBLIC_KEY'. Cannot verify signatures."
     exit 1
   fi
-  echo "Public key saved: $PUBLIC_KEY"
+  echo "Public key saved: ${BUNDLE_DIR}/downloads/${PUBLIC_KEY}"
   echo ""
 
 echo "Verifying signatures..."
@@ -128,3 +129,6 @@ for bundle in "${BUNDLE_DIR}"/*.zst; do
 done
 
 echo "==> All bundles pushed successfully."
+unset BUNDLE_DIR
+unset BUNDLE_URL_FILE
+unset BASE_PATH
