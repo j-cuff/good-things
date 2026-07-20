@@ -92,7 +92,7 @@ while IFS= read -r url; do
       continue
     fi
 
-    result=$(openssl dgst -sha256 -verify "$PUBLIC_KEY" -signature "$sigfile" "$filename" 2>&1)
+    result=$(openssl dgst -sha256 -verify "${BUNDLE_DIR}/downloads/${PUBLIC_KEY}" -signature "$sigfile" "$filename" 2>&1)
 
     if [[ "$result" == "Verified OK" ]]; then
       echo "OK    $filename"
@@ -107,7 +107,7 @@ done < "$BUNDLE_URL_FILE"
 
 echo ""
 echo "Results: $passed passed, $failed failed"
-
+exit
 echo "==> Authenticating to ECR..."
 
 palette content registry-login \
