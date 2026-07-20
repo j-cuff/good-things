@@ -57,8 +57,10 @@ echo "All downloads complete!"
 
 echo "Validating downloaded files in ${BUNDLE_DIR}..."
 echo "Downloading public key..."
-  curl -O -L "downloads/$PUBLIC_KEY_URL"
-  if [[ ! -f "$PUBLIC_KEY" ]]; then
+  mkdir -p "${BUNDLE_DIR}/downloads"
+  curl -L -o "${BUNDLE_DIR}/downloads/${PUBLIC_KEY}" "$PUBLIC_KEY_URL"
+  # curl -O -L "$PUBLIC_KEY_URL"
+  if [[ ! -f "${BUNDLE_DIR}/downloads/${PUBLIC_KEY}" ]]; then
     echo "Error: Failed to download '$PUBLIC_KEY'. Cannot verify signatures."
     exit 1
   fi
@@ -126,10 +128,3 @@ for bundle in "${BUNDLE_DIR}"/*.zst; do
 done
 
 echo "==> All bundles pushed successfully."
-
-
-
-
-
-
-

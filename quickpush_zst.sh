@@ -1,8 +1,10 @@
 #!/bin/bash
-# push-bundles.sh
-# Usage: ./push-bundles.sh <bundle-dir> <ecr-account-id> <region> <base-path>
-# Example: ./push-bundles.sh ./bundles 103448924380 us-gov-west-1 cuff-airgap/spectro-packs
-# Build a bundle, copy urls to file, then download and push to ECR using this script.
+# quick_push_zsts.sh
+# Prerequisites: palette CLI installed and configured, AWS CLI installed and configured, ORAS installed and configured, common-config.sh 
+# Usage: ./quick_push_zsts.sh <bundle-dir>
+# Example: ./quick_push_zsts.sh ./bundles
+# Used to push all .zst bundles from a directory to ECR using the palette content push command.
+
 set -euo pipefail
 source ./common-config.sh
 source ./common-functions.sh

@@ -100,8 +100,9 @@ function make_executable_if_needed() {
   fi
 }
 
-function patch_functions_file() {
+function patch_functions_file() { 
   local airgap_dir="$1"
+  local os_type="$2"
   local functions_file="${airgap_dir}/bin/functions.sh"
 
   if [[ ! -f "${functions_file}" ]]; then
@@ -114,7 +115,11 @@ function patch_functions_file() {
   fi
 
   echo "Patching ${functions_file}: replacing ecr-public with ecr"
-  sed -i "s/ecr-public/ecr/g" "${functions_file}"
+  if [[ $os_type == "macos" ]]; then
+    sed -i '' "s/ecr-public/ecr/g" "${functions_file}"
+  elif [[ $os_type == "linux" ]]; then
+    sed -i "s/ecr-public/ecr/g" "${functions_file}"
+  fi
 }
 
 function create_ecr_repo() {
@@ -155,7 +160,7 @@ function extract_missing_repos() {
   } | sed -E 's#@sha256:[a-fA-F0-9]+$##; s#:[^/]+$##' | sort -u
 }
 
-run_apply_script_with_repo_retry() {
+function run_apply_script_with_repo_retry() {
   local script_path="$1"
   local script_name
   script_name="$(basename "${script_path}")"
@@ -214,6 +219,31 @@ run_apply_script_with_repo_retry() {
   done
 }
 
+create_missing_pack_repos() {
+  local output="$1"
+  local missing
+  missing="$(echo "${output}" | grep -oP "(?<=archive/)[^']+(?= does not exist)" | sort -u || true)"
+  if [[ -z "${missing}" ]]; then
+    return 1
+  fi
+  echo "Detected missing ECR pack archive repositories:"
+  echo "${missing}" | tee -a "${LOG_FILE}"
+  while IFS= read -r pack; do
+    [[ -z "${pack}" ]] && continue
+    local repo
+    repo="$(repo_path "${ECR_PACK_BASE}/archive/${pack}")"
+    echo "Creating ECR repository if missing: ${repo}"
+    if aws ecr create-repository \
+      --repository-name "${repo}" \
+      --region "${REGION}"; then
+      echo "Created repository: ${repo}"
+    else
+      echo "Repository may already exist or create failed: ${repo}. Continuing."
+    fi
+  done <<< "${missing}"
+  return 0
+  }
+
 function download_file() { #1=version
   local version="$1"
 
@@ -264,6 +294,7 @@ function ecrLogin() {
 
   echo "✅ docker login succeeded"
 }
+
 function ensureVertexBinary() {
   # Usage:
   #   ensureVertexBinary <version>
@@ -340,75 +371,127 @@ function ensureVertexBinary() {
       ;;
   esac
 }
+function detect_os() {
+  local uname_s
+  uname_s="$(uname -s 2>/dev/null || echo unknown)"
 
-function executeCMDv2 () { #1=cmd, #2=message
-  local cmd="$1"
-  local message="${2:-Running command...}"
-  local output
-  local exit_code
-  echo "▶️  $message"
-  # capture both stdout and stderr
-  if output=$(eval "$cmd" 2>&1); then
-    exit_code=0
-  else
-    exit_code=$?
-  fi
-  if (( exit_code == 0 )); then
-    echo "✅  $message Succeeded!"
-  else
-    echo "❌  $message Failed! (exit code $exit_code)"
-  fi
-  # always show whatever came back
-  echo -e "CMD Output:\n\n$output\n"
-  return $exit_code
+  case "$uname_s" in
+    Darwin)
+      echo "macos"
+      ;;
+    Linux)
+      if grep -qi microsoft /proc/version 2>/dev/null; then
+        echo "wsl"
+      else
+        echo "linux"
+      fi
+      ;;
+    CYGWIN*|MINGW*|MSYS*)
+      echo "windows"
+      ;;
+    *)
+      echo "unknown"
+      ;;
+  esac
 }
-function setResultToVar () { #1=cmd,2=var_name
-  local cmd="$1"
-  local var_name="$2"
-  if [[ -z "$cmd" || -z "$var_name" ]]; then
-    echo "Usage: setResultToVar \"<command>\" <var_name>"
+
+function enable_docker_push_skip_if_exists() {
+  validateVar ECR_REGISTRY
+  validateVar AWS_REGION
+
+  local real_docker
+  real_docker="$(command -v docker)"
+
+  if [[ -z "${real_docker}" ]]; then
+    fail "docker command not found"
+  fi
+
+  local wrapper_dir
+  wrapper_dir="$(mktemp -d)"
+
+  export REAL_DOCKER_BIN="${real_docker}"
+  export ECR_REGISTRY
+  export AWS_REGION
+  export PATH="${wrapper_dir}:${PATH}"
+
+  cat > "${wrapper_dir}/docker" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+real_docker="${REAL_DOCKER_BIN:?REAL_DOCKER_BIN is not set}"
+
+parse_ecr_image_ref() {
+  local image_ref="$1"
+  local registry="${ECR_REGISTRY:?ECR_REGISTRY is not set}"
+
+  # Only handle pushes to our ECR registry.
+  if [[ "${image_ref}" != "${registry}/"* ]]; then
     return 1
   fi
-  local result
-  result=$(eval "$cmd")
-  # Assign to named variable using eval
-  eval "$var_name=\"\$result\""
+
+  local remainder
+  remainder="${image_ref#${registry}/}"
+
+  # Remove digest if present.
+  remainder="${remainder%%@*}"
+
+  local repo
+  local tag
+
+  # If no tag was specified, Docker defaults to latest.
+  if [[ "${remainder##*/}" == *":"* ]]; then
+    repo="${remainder%:*}"
+    tag="${remainder##*:}"
+  else
+    repo="${remainder}"
+    tag="latest"
+  fi
+
+  if [[ -z "${repo}" || -z "${tag}" ]]; then
+    return 1
+  fi
+
+  printf '%s\t%s\n' "${repo}" "${tag}"
 }
-function verifyCMDOutput () { # 1=cmd 2=what2look4 3=operator (equals | notequal) 4=message
-  local cmd="$1"
-  local query="$2"
-  local operator="$3"
-  local message="$4"
-  echo -e "\n▶️ $message"
-  echo "Command: $cmd"
-  echo "Query: $query"
-  output=$(eval "$cmd")
-  echo -e "Output: \n$output"
-  case "$operator" in
-  equals)
-    if [[ "$output" == *"$query"* ]]; then
-      echo -e "\r✅ $message :: Command Output Matches Query!\n"
-      return 0
-    else
-      echo -e "\r❌ $message :: Command Output Does NOT Match Query!\n"
-      exit 1
+
+ecr_image_tag_exists() {
+  local repo="$1"
+  local tag="$2"
+
+  aws ecr describe-images \
+    --region "${AWS_REGION:?AWS_REGION is not set}" \
+    --repository-name "${repo}" \
+    --image-ids "imageTag=${tag}" \
+    >/dev/null 2>&1
+}
+
+# Intercept:
+#   docker push <image>
+if [[ "${1:-}" == "push" ]]; then
+  image_ref="${!#}"
+
+  parsed="$(parse_ecr_image_ref "${image_ref}" || true)"
+
+  if [[ -n "${parsed}" ]]; then
+    IFS=$'\t' read -r repo tag <<< "${parsed}"
+
+    if ecr_image_tag_exists "${repo}" "${tag}"; then
+      echo "Image already exists in ECR. Skipping push:"
+      echo "  ${image_ref}"
+      exit 0
     fi
-    ;;
-  notequal)
-    if [[ "$output" != *"$query"* ]]; then
-      echo -e "\r✅ $message CMD Output Does NOT Match Query!\n"
-      return 0
-    else
-      echo -e "\r❌ $message CMD Output Matches Query!\n"
-      exit 1
-    fi
-    ;;
-  esac
-}  
-function getSecret () { #Usage: getSecret <filename>
-  local file="$1" line
-  # Read just the first line (strips trailing newline)
-  IFS= read -r line < "$file"
-  # Assign into the caller’s variable
-  echo "$line"
+
+    echo "Image does not exist in ECR. Pushing:"
+    echo "  ${image_ref}"
+  fi
+fi
+
+exec "${real_docker}" "$@"
+EOF
+
+  chmod +x "${wrapper_dir}/docker"
+
+  echo "Docker push skip wrapper enabled."
+  echo "Real docker: ${real_docker}"
+  echo "Wrapper dir: ${wrapper_dir}"
 }

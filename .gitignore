@@ -1,0 +1,17 @@
+airgap-vertex-v4.9.18.bin
+cert-manager-1.19.3.sig.bin
+cert-manager-1.19.3.zst
+cni-cilium-fips-1.19.1.sig.bin
+cni-cilium-fips-1.19.1.zst
+csi-aws-ebs-1.60.1.sig.bin
+csi-aws-ebs-1.60.1.zst
+kubernetes-1.35.3.sig.bin
+kubernetes-1.35.3.zst
+multus-cni-2.2.18.zst
+push2ecr-4.9.18.log
+spectro-proxy-1.5.6.sig.bin
+spectro-proxy-1.5.6.zst
+ubuntu-aws-22.04.sig.bin
+ubuntu-aws-22.04.zst
+**/spectroairgap-*/
+push_to_ecr-*.log

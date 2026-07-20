@@ -1,13 +1,35 @@
 #! /bin/bash
-# Usage: ./push2ecr.sh <version>
-# Example: ./push2ecr.sh 4.9.18
+# Usage: ./push_to_ecr.sh <version>
+# Example: ./push_to_ecr.sh 4.9.18
 set -euo pipefail
 source ./common-config.sh
 source ./common-functions.sh
 validateVar VERTEX_VERSION
-touch push2ecr-$VERTEX_VERSION.log
-exec > >(tee -a push2ecr-$VERTEX_VERSION.log) 2>&1
+timestamp=$(date +%Y%m%d%H%M%S)
+touch push_to_ecr-$VERTEX_VERSION-$timestamp.log
+exec > >(tee -a push_to_ecr-$VERTEX_VERSION-$timestamp.log) 2>&1
 date
+os_type=$(detect_os)
+
+function usage() {
+  echo "Usage: $0 <version> [--skip-extraction|-s]"
+  echo ""
+  echo "Examples:"
+  echo "  $0 4.9.18"
+  echo "  $0 4.9.18 --skip-extraction"
+  echo "  $0 4.9.18 -s"
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -s|--skip-extraction) SKIP_EXTRACTION=true ;;
+    -h|--help) usage; exit 0 ;;
+    -*) echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
+    *) [[ -z "${VERSION:-}" ]] && VERSION="$1" || { echo "Unexpected argument: $1" >&2; usage >&2; exit 1; } ;;
+  esac
+  shift
+done
+
 
 #Step 1: Validate Variables
 ###########################
@@ -24,15 +46,16 @@ validateVar DOWNLOAD_PASS warn || true
 validateVar SCRIPT_DIR
 validateVar AIRGAP_DIR
 validateVar BINARY
-
+validateVar SKIP_EXTRACTION warn || true
+validateVar detect_os
 
 #Step 2: Authenticate to ECR
 ############################
 print_boxed "Step #2: Authenticating ORAS and Docker to ECR"
 ecrLogin
-#aws ecr get-login-password --region $AWS_REGION | oras login --username AWS --password-stdin $ECR_REGISTRY
-#aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
 
+# Enable docker push skip logic after auth.
+enable_docker_push_skip_if_exists
 
 #Step 3: Setup Env and extract the binary
 #########################################
@@ -60,34 +83,27 @@ ensureVertexBinary "$VERTEX_VERSION"
 
 # Checking for the binary and extracting it if needed
 if [[ "${SKIP_EXTRACTION}" == "false" ]]; then
-  if [[ ! -f "${BINARY}" ]]; then
-    fail "Binary not found: ${BINARY}"
-  fi
-
-extract_binary "${BINARY}" "${AIRGAP_DIR}"
-
+  extract_binary "${BINARY}" "${AIRGAP_DIR}"
 else
   echo "Skipping binary extraction."
-
   if [[ ! -d "${AIRGAP_DIR}" ]]; then
     fail "Airgap directory not found: ${AIRGAP_DIR}. Cannot use --skip-extraction unless it already exists."
   fi
 fi
 
+patch_functions_file "${AIRGAP_DIR}" "${os_type}"
 
-if [ ! -x "$BINARY" ]; then
-  echo "Binary is not executable. Fixing..."
-  chmod +x "$BINARY"
-fi
+#Step 4: Setup Env and extract the binary
+#########################################
 
-patch_functions_file "${AIRGAP_DIR}"
-
+print_boxed "Step #4: Pushing Packs and Images to Airgapped Private ECR's"
 echo "Starting airgap push for version: ${VERTEX_VERSION}"
 echo "Binary: ${BINARY}"
 echo "Registry: ${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_BASE_CONTENT_PATH}"
+echo "Packs Push to: ${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_BASE_CONTENT_PATH%/}${ECR_PACK_BASE:+/${ECR_PACK_BASE#/}}/spectro-packs"
+echo "Images Push to: ${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_BASE_CONTENT_PATH%/}${ECR_IMAGE_BASE:+/${ECR_IMAGE_BASE#/}}"
 echo ""
-
-# --- Run the binary, capture output, auto-create any missing repos, retry ---
+# Run the binary, capture output, auto-create any missing repos, retry ---
 pushd "${AIRGAP_DIR}" >/dev/null
 
 run_apply_script_with_repo_retry "apply_pack.sh"
