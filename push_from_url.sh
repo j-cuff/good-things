@@ -3,7 +3,7 @@
 # Usage: ./push-bundles.sh <bundle-dir> <ecr-account-id> <region> <base-path>
 # Example: ./push-bundles.sh ./bundles 103448924380 us-gov-west-1 cuff-airgap/spectro-packs
 # Build a bundle, copy urls to file, then download and push to ECR using this script.
-set -euo pipefail
+set -uo pipefail
 source ./common-config.sh
 source ./common-functions.sh
 
